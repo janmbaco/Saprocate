@@ -1,5 +1,5 @@
 # Saprocate
-Multicurrency BlockChain 
+## Multicurrency BlockChain 
 
 Today the world of decentralized blockchains focus on providing a currency that, lacking a clear source of that currency, compromises its integrity to a centralized capitalist system. Where far from simply being a fair currency for internet exchange, it is offered to the most embarrassing speculation. 
 
