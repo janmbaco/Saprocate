@@ -1,0 +1,19 @@
+syntax = "proto3";
+
+option go_package = "github.com/janmbaco/saprocate/http/grpc/protoservice";
+
+import "github.com/janmbaco/saprocate/core/types/protobuf/messages.proto";
+
+package saprocate.protoservice;
+
+service gRPCService{
+
+    rpc ReservePrevHash (saprocate.protobuf.ReservePrevHashRequest) returns (saprocate.protobuf.ReservePrevHasResponse) {}
+    
+    rpc CreateCurrency (saprocate.protobuf.CreateCurrencyRequest) returns (saprocate.protobuf.CreateCurrencyResponse) {}
+
+    rpc CreateTransaction (saprocate.protobuf.CreateTransactionRequest) returns (saprocate.protobuf.CreateTransactionResponse) {}
+
+    rpc GetBalance (saprocate.protobuf.GetBalanceRequest) returns (saprocate.protobuf.GetBalanceResponse) {}
+
+}

@@ -1,0 +1,81 @@
+syntax = "proto3";
+
+option go_package = "github.com/janmbaco/saprocate/core/types/protobuf";
+
+
+import "google/protobuf/timestamp.proto";
+import "google/protobuf/duration.proto";
+
+package saprocate.protobuf;
+
+message ReservePrevHashRequest{
+    bytes sign_actor = 1;
+}
+
+message ReservePrevHasResponse{
+    bytes prev_hash = 1;
+    google.protobuf.Duration expiration = 2;
+}
+
+message CodeResponse {
+    enum Code {
+        OK = 0;
+        BADREQUEST = 1;
+        UNAUTHORIZED = 3;
+        FORBIDDEN = 4;
+        NOVERIFIEDSIGN = 5;
+    }
+    Code code = 1;
+}
+
+message Header {
+    bytes prev_hash = 1;
+    google.protobuf.Timestamp time_stamp = 2;
+    bytes sign_actor = 3;
+}
+
+message CreateCurrencyRequest {
+    bytes hash = 1;
+    Data data = 2;
+    message Data {
+        Header header = 2;
+        message CurrencyCreation{
+            bytes asn1 = 1;
+            string purpose = 2;
+        }
+        CurrencyCreation body = 3;
+    }
+}
+
+message CreateCurrencyResponse{
+    CodeResponse code = 1;
+}
+
+message CreateTransactionRequest {
+    bytes hash = 1;
+    Data data = 2;
+    message Data {
+        Header header = 2;
+        message CoinsTransaction {
+            receiver_actor = 1
+            repeated bytes block_hash = 2;
+        }
+        CoinsTransaction body= 3;
+    }
+}
+
+message CreateTransactionResponse {
+    CodeResponse code = 1;
+}
+
+message GetBalanceRequest {
+    bytes sign_actor = 1;
+}
+
+message GetBalanceResponse{
+    message Balance {
+        bytes currency = 1;
+        int32 balance = 2;
+    }
+    repeated Balance resultados = 1;
+}
