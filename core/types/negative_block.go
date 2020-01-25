@@ -1,8 +1,12 @@
 package types
 
-import "github.com/ontio/ontology/common"
+import (
+	"github.com/janmbaco/Saprocate/core/types/block"
+	"github.com/ontio/ontology/common"
+)
 
 type NegativeBlock struct{
+	block.Key
 	PositiveBlockSing common.Uint256
 	SignerBlock common.Uint256
 }
