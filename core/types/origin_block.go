@@ -13,9 +13,9 @@ type OriginBlock struct{
 	PubilcKey rsa.PublicKey
 }
 
-func(origin *OriginBlock) SerializeValue() []byte{
+func(this *OriginBlock) SerializeValue() []byte{
 	sink := common.ZeroCopySink{}
-	pubBytes, err := asn1.Marshal(origin.PubilcKey)
+	pubBytes, err := asn1.Marshal(this.PubilcKey)
 	cross.TryPanic(err)
 	sink.WriteBytes(pubBytes)
 	return sink.Bytes()
