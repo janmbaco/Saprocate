@@ -7,13 +7,13 @@ import (
 
 type PositiveBlock struct{
 	block.Key
-	Numus common.Uint256
-	Timestamp uint64
+	PrevHash common.Uint256
+	Coin block.Coin
 }
 
-func(positiveBlock *PositiveBlock) SerializeValue() []byte{
-	sink := common.ZeroCopySink{}
-	sink.WriteHash(positiveBlock.Numus)
-	sink.WriteUint64(positiveBlock.Timestamp)
+func(this *PositiveBlock) SerializeValue() []byte{
+	sink := &common.ZeroCopySink{}
+	sink.WriteHash(this.PrevHash)
+	this.Coin.Serilize(sink)
 	return sink.Bytes()
 }

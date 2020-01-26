@@ -7,17 +7,17 @@ import (
 
 type PayBlock struct{
 	block.Key
-	SignerSign common.Uint256
-	Coins []PositiveBlock
+	PrevHash common.Uint256
+	From common.Uint256
+	Coins []block.Coin
 }
 
-func(payBlock *PayBlock) SerializeValue() [] byte{
-	sink:=common.ZeroCopySink{}
-	sink.WriteHash(payBlock.SignerSign)
-	sink.WriteVarUint(len(payBlock.Coins))
-	for _, positiveBlock := range payBlock.Coins{
-		sink.WriteBytes(positiveBlock.SerializeKey())
-		sink.WriteBytes(positiveBlock.SerializeValue())
+func(this *PayBlock) SerializeValue() [] byte{
+	sink:= &common.ZeroCopySink{}
+	sink.WriteHash(this.From)
+	sink.WriteVarUint(uint64(len(this.Coins)))
+	for _, coin := range this.Coins{
+		coin.Serilize(sink)
 	}
 	return sink.Bytes()
 }
