@@ -7,15 +7,14 @@ import (
 
 type NegativeBlock struct{
 	block.Key
-	PrevHash common.Uint256
-	PositiveBlockSing common.Uint256
-	SignerBlock common.Uint256
+	Previous *block.Key
+	PositiveBlock *block.Key
 }
 
 func(this *NegativeBlock) SerializeValue() []byte{
-	sink:=common.ZeroCopySink{}
-	sink.WriteHash(this.PositiveBlockSing)
-	sink.WriteHash(this.SignerBlock)
+	sink := &common.ZeroCopySink{}
+	this.Previous.Serialize(sink)
+	this.PositiveBlock.Serialize(sink)
 	return sink.Bytes()
 }
 

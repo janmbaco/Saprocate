@@ -10,7 +10,7 @@ import (
 
 type OriginBlock struct{
 	block.Key
-	PubilcKey rsa.PublicKey
+	PubilcKey *rsa.PublicKey
 }
 
 func(this *OriginBlock) SerializeValue() []byte{
@@ -20,3 +20,5 @@ func(this *OriginBlock) SerializeValue() []byte{
 	sink.WriteBytes(pubBytes)
 	return sink.Bytes()
 }
+
+
