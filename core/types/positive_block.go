@@ -7,13 +7,13 @@ import (
 
 type PositiveBlock struct{
 	block.Key
-	PrevHash common.Uint256
-	Coin block.Coin
+	Previous *block.Key
+	Coin *block.Coin
 }
 
 func(this *PositiveBlock) SerializeValue() []byte{
 	sink := &common.ZeroCopySink{}
-	sink.WriteHash(this.PrevHash)
+	this.Previous.Serialize(sink)
 	this.Coin.Serilize(sink)
 	return sink.Bytes()
 }

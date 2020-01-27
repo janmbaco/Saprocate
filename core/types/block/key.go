@@ -7,9 +7,17 @@ type Key struct{
 	Sign common.Uint256
 }
 
-func (key *Key) SerializeKey()  []byte{
-	sink := common.ZeroCopySink{}
-	sink.WriteByte(byte(key.Type))
-	sink.WriteHash(key.Sign)
+func(this *Key) GetType() Type{
+	return this.Type
+}
+
+func (this *Key) SerializeKey()  []byte{
+	sink := &common.ZeroCopySink{}
+	this.Serialize(sink)
 	return sink.Bytes()
+}
+
+func(this *Key) Serialize(sink *common.ZeroCopySink){
+	sink.WriteByte(byte(this.Type))
+	sink.WriteHash(this.Sign)
 }

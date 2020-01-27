@@ -7,17 +7,17 @@ import (
 
 type TransferBlock struct{
 	block.Key
-	PrevHash common.Uint256
-	From common.Uint256
-	To common.Uint256
-	Coins []block.Coin
+	Previous *block.Key
+	From *block.Key
+	To *block.Key
+	Coins []*block.Coin
 }
 
 func(this *TransferBlock) SerializeValue() []byte{
 	sink:=&common.ZeroCopySink{}
-	sink.WriteHash(this.PrevHash)
-	sink.WriteHash(this.From)
-	sink.WriteHash(this.To)
+	this.Previous.Serialize(sink)
+	this.From.Serialize(sink)
+	this.To.Serialize(sink)
 	sink.WriteVarUint(uint64(len(this.Coins)))
 	for  _ , coin := range this.Coins{
 		coin.Serilize(sink)
