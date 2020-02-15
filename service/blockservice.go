@@ -6,34 +6,42 @@ import (
 	"crypto/sha256"
 	"errors"
 	"fmt"
+	common2 "github.com/janmbaco/Saprocate/common"
 	store2 "github.com/janmbaco/Saprocate/core/store"
 	"github.com/janmbaco/Saprocate/core/types"
 	"github.com/janmbaco/Saprocate/core/types/blockpkg"
 	"github.com/janmbaco/Saprocate/core/types/blockpkg/body"
 	"github.com/janmbaco/go-reverseproxy-ssl/cross"
 	"github.com/ontio/ontology/common"
-	"sync"
+	"math/rand"
+	"time"
 )
 
+const MaxWaitForReserve = 1000
+
 type (
-	prevHashReserve  struct{
-		origin *blockpkg.Key
-		prevHash *blockpkg.Key
+	BlockService struct {
+		tryEnChain chan bool
+		trySaving  chan bool
+		reserving  chan bool
+		saving     chan bool
+		nonce      uint32
+		store      store2.Interface
 	}
-	BlockService struct{
-		m 				sync.Mutex
-		prevHashReserve *prevHashReserve
-		store 			store2.Interface
-	})
+)
 
 func NewBlockService(store store2.Interface) *BlockService {
-	return &BlockService{
-		prevHashReserve: nil,
-		store:           store,
+	blockService := &BlockService{
+		tryEnChain: make(chan bool, 1),
+		trySaving:  make(chan bool, 1),
+		reserving:  make(chan bool),
+		saving:     make(chan bool),
+		store:      store,
 	}
+	go blockService.reservePrevHashLoop()
+	return blockService
 }
-
-func(this *BlockService) ExistsOrigin(originSign common.Uint256) bool {
+func (this *BlockService) ExistsOrigin(originSign common.Uint256) bool {
 	return this.store.Has(
 		&blockpkg.Key{
 			Type: blockpkg.Origin,
@@ -41,39 +49,39 @@ func(this *BlockService) ExistsOrigin(originSign common.Uint256) bool {
 		})
 }
 
-func(this *BlockService) RegisterOrigin(origin *blockpkg.Block)  {
-	this.onLock(func() {
-		this.verifyOrigin(origin)
-		this.store.Save(origin)
-	})
+func (this *BlockService) RegisterOrigin(origin *blockpkg.Block) {
+	this.verifyOrigin(origin)
+	this.store.Save(origin)
 }
 
-
-func(this *BlockService) ReservePrevHash(block *blockpkg.ChainLinkBlock) {
-	this.onLock(func() {
-		this.verifyExistsOrigin(block)
-		lastKey := this.store.GetLastKey()
-		block.SetPrevHash(lastKey)
-		this.prevHashReserve = &prevHashReserve{
-			origin:   block.GetOrigin(),
-			prevHash: lastKey,
-		}
-	})
+func (this *BlockService) ReservePrevHash(block *blockpkg.ChainLinkBlock) uint32 {
+	this.verifyExistsOrigin(block)
+	this.tryEnChain <- true
+	block.PrevHashKey = this.store.GetLastKey()
+	this.nonce = rand.Uint32()
+	this.reserving <- true
+	return this.nonce
 }
 
-func(this *BlockService) EnchainBlock(block *blockpkg.ChainLinkBlock)  {
-	this.onLock(
+func (this *BlockService) EnchainBlock(block *blockpkg.ChainLinkBlock, nonce uint32) {
+	this.trySaving <- true
+	common2.TryFinally(
 		func() {
+			this.verifyNonce(nonce)
+			this.saving <- true
 			this.verifyPevHash(block)
 			this.verifySign(block)
 			if block.GetType() != blockpkg.Negative {
 				this.verifyPoints(block.Body.(blockpkg.PointsBody))
 			}
 			this.store.Save(block)
+			<-this.tryEnChain
+		}, func() {
+			<-this.trySaving
 		})
 }
 
-func(this *BlockService) GetSummary(origin blockpkg.Key) *types.Summary {
+func (this *BlockService) GetSummary(origin blockpkg.Key) *types.Summary {
 
 	result := &types.Summary{
 		Owner:       &origin,
@@ -83,9 +91,9 @@ func(this *BlockService) GetSummary(origin blockpkg.Key) *types.Summary {
 	nxBlocks := this.store.GetAll(blockpkg.Negative)
 	isInNxBlocks := func(pxBlock *blockpkg.ChainLinkBlock) bool {
 		result := false
-		for _, nxBlock := range nxBlocks{
+		for _, nxBlock := range nxBlocks {
 			nx := nxBlock.(*blockpkg.ChainLinkBlock)
-			if nx.Body.(*body.Negative).PositiveBlockKey == pxBlock.Header.Key{
+			if nx.Body.(*body.Negative).PositiveBlockKey == pxBlock.Header.Key {
 				result = true
 				break
 			}
@@ -93,8 +101,8 @@ func(this *BlockService) GetSummary(origin blockpkg.Key) *types.Summary {
 		return result
 	}
 
-	for _, pxBlock := range pxBlocks{
-		if *pxBlock.GetOrigin() == origin{
+	for _, pxBlock := range pxBlocks {
+		if *pxBlock.GetOrigin() == origin {
 			px := pxBlock.(*blockpkg.ChainLinkBlock)
 			if !isInNxBlocks(px) {
 				result.PointsCards[*px.Body.(*body.Positive).Point.Origin]++
@@ -106,52 +114,68 @@ func(this *BlockService) GetSummary(origin blockpkg.Key) *types.Summary {
 
 }
 
-func(this *BlockService) verifyOrigin(origin *blockpkg.Block){
+func (this *BlockService) reservePrevHashLoop() {
+	for {
+		<-this.reserving
+		var timeOut bool
+		select {
+		case <-this.saving:
+			break
+		case <-time.After(MaxWaitForReserve * time.Millisecond):
+			timeOut = true
+			break
+		}
+		this.trySaving <- true
+		if timeOut {
+			this.nonce = rand.Uint32()
+			<-this.tryEnChain
+		}
+		<-this.trySaving
+	}
+}
+
+func (this *BlockService) verifyOrigin(origin *blockpkg.Block) {
 	pk := origin.Body.(*body.Origin).PublicKey
 	this.rsaVerify(pk, origin.GetDataSigned(), origin.GetSign())
 }
 
-func(this *BlockService) verifyExistsOrigin(block *blockpkg.ChainLinkBlock){
+func (this *BlockService) verifyExistsOrigin(block *blockpkg.ChainLinkBlock) {
 	if !this.ExistsOrigin(block.GetOrigin().Hash) {
 		panic(errors.New("the origin of the block not exits in the block chain"))
 	}
 }
 
-func(this *BlockService) verifyPevHash(block *blockpkg.ChainLinkBlock){
-
-	if this.prevHashReserve == nil{
-		panic(errors.New("there isn't any reserve of previous hash"))
-	}
-
-	if *this.prevHashReserve.origin != *block.GetOrigin(){
-		panic(errors.New("there is a reserve from other origin"))
-	}
-
-	if *this.prevHashReserve.prevHash != *block.GetPrevHash(){
+func (this *BlockService) verifyPevHash(block *blockpkg.ChainLinkBlock) {
+	if *this.store.GetLastKey() != *block.PrevHashKey {
 		panic(errors.New("the previous hash reserved is distinct to the previous hash of the block"))
 	}
-
 }
 
-func(this *BlockService) verifySign(block *blockpkg.ChainLinkBlock){
+func (this *BlockService) verifyNonce(nonce uint32) {
+	if this.nonce != nonce {
+		panic(errors.New("the nonce is incorrect"))
+	}
+}
+
+func (this *BlockService) verifySign(block *blockpkg.ChainLinkBlock) {
 	pk := this.getOriginBlock(block).Body.(*body.Origin).PublicKey
-   	this.rsaVerify(pk, block.GetDataSigned(), block.GetSign())
+	this.rsaVerify(pk, block.GetDataSigned(), block.GetSign())
 }
 
-func(this *BlockService) verifyPoints(block blockpkg.PointsBody) {
+func (this *BlockService) verifyPoints(block blockpkg.PointsBody) {
 	var origin *blockpkg.Key
 
 	txBlocks := this.store.GetAll(blockpkg.Transfer)
-	txFromOrigin := make([]*body.Transfer,0)
+	txFromOrigin := make([]*body.Transfer, 0)
 
-	fillTransferFromOrigin := func(from blockpkg.Key){
+	fillTransferFromOrigin := func(from blockpkg.Key) {
 		for _, txBlock := range txBlocks {
 			if *txBlock.GetOrigin() == from {
 				txFromOrigin = append(txFromOrigin, txBlock.(*body.Transfer))
 			}
 		}
 	}
-	verifyPointNotTransferred := func(point *blockpkg.Point)  {
+	verifyPointNotTransferred := func(point *blockpkg.Point) {
 		for _, tx := range txFromOrigin {
 			for _, p := range tx.GetPoints() {
 				if p == point {
@@ -161,8 +185,8 @@ func(this *BlockService) verifyPoints(block blockpkg.PointsBody) {
 		}
 	}
 
-	for _, point := range block.GetPoints(){
-		if origin == nil{
+	for _, point := range block.GetPoints() {
+		if origin == nil {
 			fillTransferFromOrigin(*point.Origin)
 		} else if point.Origin != origin {
 			panic(fmt.Errorf("the point must have the same origin. \n origin expected %v \n origin found: %v", origin.Hash, point.Origin.Hash))
@@ -175,32 +199,18 @@ func(this *BlockService) verifyPoints(block blockpkg.PointsBody) {
 	}
 }
 
-func(this *BlockService) rsaVerify(pk *rsa.PublicKey, data []byte, signature []byte) {
+func (this *BlockService) rsaVerify(pk *rsa.PublicKey, data []byte, signature []byte) {
 	digest := sha256.Sum256(data)
 	cross.TryPanic(rsa.VerifyPKCS1v15(pk, crypto.SHA256, digest[:], signature))
 }
 
-func(this *BlockService) getOriginBlock(block *blockpkg.ChainLinkBlock) *blockpkg.Block {
+func (this *BlockService) getOriginBlock(block *blockpkg.ChainLinkBlock) *blockpkg.Block {
 	var result *blockpkg.Block
 	originBlock := this.store.Get(block.GetOrigin())
-	if  originBlock.GetType() == blockpkg.Positive {
+	if originBlock.GetType() == blockpkg.Positive {
 		result = this.store.Get(block.GetOrigin()).(*blockpkg.Block)
-	} else{
+	} else {
 		result = originBlock.(*blockpkg.Block)
 	}
 	return result
 }
-
-func (this *BlockService) onLock(callBack func())  {
-	this.m.Lock()
-	defer func(){
-		this.m.Unlock()
-		if re := recover(); re != nil {
-			panic(re.(error))
-		}
-	}()
-	callBack()
-}
-
-
-

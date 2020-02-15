@@ -18,22 +18,21 @@ import (
 
 var blockService *BlockService
 
-type keyPairStruct struct{
-	privateKey 	*rsa.PrivateKey
-	publicKey *rsa.PublicKey
-	key *blockpkg.Key
-	sign []byte
+type keyPairStruct struct {
+	privateKey *rsa.PrivateKey
+	publicKey  *rsa.PublicKey
+	key        *blockpkg.Key
+	sign       []byte
 }
+
 var keyPair []*keyPairStruct
-
-
 
 func TestMain(m *testing.M) {
 	dbFile := "./test"
 	testLevelDB := store2.NewLevelDBStore(dbFile, common2.NewCrypter([]byte{0x0, 0x1, 0x2, 0x3, 0x4, 0x5, 0x6, 0x7, 0x8, 0x9, 0xa, 0xb, 0xc, 0xd, 0xe, 0xf}))
 	testLevelDB.Open()
-	keyPair =  make([]*keyPairStruct,4)
-	for i := 0; i< 4; i++{
+	keyPair = make([]*keyPairStruct, 4)
+	for i := 0; i < 4; i++ {
 		keyPair[i], _ = generateKeyPair(2048)
 		block := &blockpkg.Block{
 			Header: nil,
@@ -49,26 +48,26 @@ func TestMain(m *testing.M) {
 		keyPair[i].sign = sign
 	}
 	blockService = NewBlockService(testLevelDB)
-	defer func(){
+	defer func() {
 		testLevelDB.Close()
-		os.RemoveAll(dbFile)
-	} ()
+		_ = os.RemoveAll(dbFile)
+	}()
 	m.Run()
 }
 
-func TestRegisterOrigins(t *testing.T){
+func TestRegisterOrigins(t *testing.T) {
 	var wg sync.WaitGroup
-	for _, keypair := range keyPair{
+	for _, keypair := range keyPair {
 		wg.Add(1)
-		go func(keypair *keyPairStruct){
+		go func(keypair *keyPairStruct) {
 			defer wg.Done()
 			blockService.RegisterOrigin(&blockpkg.Block{
 				Header: &blockpkg.Header{
 					Key:  keypair.key,
 					Sign: keypair.sign,
 				},
-				Body:   &body.Origin{
-					PublicKey:keypair.publicKey,
+				Body: &body.Origin{
+					PublicKey: keypair.publicKey,
 				},
 			})
 
@@ -78,12 +77,12 @@ func TestRegisterOrigins(t *testing.T){
 	wg.Wait()
 }
 
-func TestGivePoints(t *testing.T){
+func TestGivePoints(t *testing.T) {
 	var wg sync.WaitGroup
-	for i := 0; i < 100; i++ {
-		for j := 0; j<2;j++{
+	for i := 0; i < 1000; i++ {
+		for j := 0; j < 2; j++ {
 			wg.Add(1)
-			go func(j int){
+			go func(i int, j int) {
 				defer wg.Done()
 				point := blockpkg.Point{
 					Origin:    keyPair[j].key,
@@ -93,31 +92,35 @@ func TestGivePoints(t *testing.T){
 				}
 				point.Sign, _ = sign(keyPair[j].privateKey, point.GetDataSigned())
 				positive := &blockpkg.ChainLinkBlock{
-					Block:       blockpkg.Block{
+					Block: blockpkg.Block{
 						Header: &blockpkg.Header{
-							Key:  keyPair[j].key,
+							Key: &blockpkg.Key{
+								Type: blockpkg.Positive,
+								Hash: common.UINT256_EMPTY,
+							},
 							Sign: nil,
 						},
-						Body:   &body.Positive{
-							Point:&point,
+						Body: &body.Positive{
+							Point: &point,
 						},
 					},
 					PrevHashKey: nil,
 				}
-				blockService.ReservePrevHash(positive)
-				positive.Header.Sign, _ = sign(keyPair[j+2].privateKey, positive.GetDataSigned())
-				blockService.EnchainBlock(positive)
-
-			}(j)
-
+				common2.TryError(func() {
+					if i == 5 {
+						time.Sleep(1)
+					}
+					nonce := blockService.ReservePrevHash(positive)
+					positive.Header.Sign, _ = sign(keyPair[j+2].privateKey, positive.GetDataSigned())
+					blockService.EnchainBlock(positive, nonce)
+				}, func(err error) {
+					t.Logf("i %d j %d error %s", i, j, err.Error())
+				})
+			}(i, j)
 		}
 	}
 	wg.Wait()
 }
-
-
-
-
 
 // GenerateKeyPair generates a new key pair
 func generateKeyPair(bits int) (*keyPairStruct, error) {
