@@ -1,10 +1,13 @@
 package store
 
-import "github.com/janmbaco/Saprocate/core/types/block"
+import "github.com/janmbaco/Saprocate/core/types/blockpkg"
 
-type Interface interface{
-	Save(block block.Interface)
-	SaveBatch(block []block.Interface)
-	Get(key *block.Key) block.Interface
-	GetAll(t block.Type) []block.Interface
+type Interface interface {
+	Has(key *blockpkg.Key) bool
+	Save(block blockpkg.Interface)
+	Get(key *blockpkg.Key) blockpkg.Interface
+	GetAll(t blockpkg.Type) []blockpkg.Interface
+	GetLastKey() *blockpkg.Key
+	Open()
+	Close()
 }

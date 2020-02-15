@@ -1,4 +1,4 @@
-package block
+package blockpkg
 
 type Type byte
 
