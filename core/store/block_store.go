@@ -1,16 +1,18 @@
-package types
+package store
 
 import (
 	"crypto/rsa"
 	"encoding/asn1"
 	"github.com/janmbaco/Saprocate/core/types/blockpkg"
 	"github.com/janmbaco/Saprocate/core/types/blockpkg/body"
+	"github.com/janmbaco/Saprocate/core/types/blockpkg/header"
+	"github.com/janmbaco/Saprocate/core/types/blockpkg/impl"
 	"github.com/janmbaco/go-reverseproxy-ssl/cross"
 	"github.com/ontio/ontology/common"
 	"io"
 )
 
-func BlockFromBytes(key *blockpkg.Key, value []byte) blockpkg.Interface {
+func BlockFromBytes(key *header.Key, value []byte) blockpkg.Interface {
 	var result blockpkg.Interface
 	switch key.Type {
 	case blockpkg.Origin:
@@ -20,18 +22,18 @@ func BlockFromBytes(key *blockpkg.Key, value []byte) blockpkg.Interface {
 	case blockpkg.Negative:
 		result = newNegativeBlock(key, value)
 	case blockpkg.Transfer:
-		result =newTransferBlock(key, value)
+		result = newTransferBlock(key, value)
 	case blockpkg.Pay:
 		result = newPayBlock(key, value)
 	}
 	return result
 }
 
-func KeyFromBytes(raw []byte) *blockpkg.Key {
+func KeyFromBytes(raw []byte) *header.Key {
 	return getSourceKey(common.NewZeroCopySource(raw))
 }
 
-func newOriginBlock(key *blockpkg.Key, value []byte) *blockpkg.Block {
+func newOriginBlock(key *header.Key, value []byte) *impl.Block {
 	source := common.NewZeroCopySource(value)
 	header := getSourceHeader(key, source)
 	buff, _, _, eof := source.NextVarBytes()
@@ -42,13 +44,13 @@ func newOriginBlock(key *blockpkg.Key, value []byte) *blockpkg.Block {
 	body := &body.Origin{
 		PublicKey: pk,
 	}
-	return &blockpkg.Block{
+	return &impl.Block{
 		Header: header,
 		Body:   body,
 	}
 }
 
-func newPositiveBlock(key *blockpkg.Key, value []byte) *blockpkg.ChainLinkBlock {
+func newPositiveBlock(key *header.Key, value []byte) *impl.ChainLinkBlock {
 	source := common.NewZeroCopySource(value)
 	header := getSourceHeader(key, source)
 	point := getSourcePoint(source)
@@ -56,8 +58,8 @@ func newPositiveBlock(key *blockpkg.Key, value []byte) *blockpkg.ChainLinkBlock 
 		Point:          point,
 	}
 	prev := getSourceKey(source)
-	return &blockpkg.ChainLinkBlock{
-		Block:       blockpkg.Block{
+	return &impl.ChainLinkBlock{
+		Block:       impl.Block{
 			Header: header,
 			Body:   body,
 		},
@@ -65,7 +67,7 @@ func newPositiveBlock(key *blockpkg.Key, value []byte) *blockpkg.ChainLinkBlock 
 	}
 }
 
-func newNegativeBlock(key *blockpkg.Key, value []byte) *blockpkg.ChainLinkBlock {
+func newNegativeBlock(key *header.Key, value []byte) *impl.ChainLinkBlock {
 	source := common.NewZeroCopySource(value)
 	header := getSourceHeader(key, source)
 	positiveBlock := getSourceKey(source)
@@ -73,8 +75,8 @@ func newNegativeBlock(key *blockpkg.Key, value []byte) *blockpkg.ChainLinkBlock 
 		PositiveBlockKey: positiveBlock,
 	}
 	prev := getSourceKey(source)
-	return &blockpkg.ChainLinkBlock{
-		Block:       blockpkg.Block{
+	return &impl.ChainLinkBlock{
+		Block:       impl.Block{
 			Header: header,
 			Body:   body,
 		},
@@ -82,12 +84,12 @@ func newNegativeBlock(key *blockpkg.Key, value []byte) *blockpkg.ChainLinkBlock 
 	}
 }
 
-func newTransferBlock(key *blockpkg.Key, value []byte) *blockpkg.ChainLinkBlock {
+func newTransferBlock(key *header.Key, value []byte) *impl.ChainLinkBlock {
 	source := common.NewZeroCopySource(value)
 	header := getSourceHeader(key, source)
 	from := getSourceKey(source)
 	to := getSourceKey(source)
-	var coins []*blockpkg.Point
+	var coins []*body.Point
 	m, eof := source.NextUint64()
 	tryEof(eof)
 	for i := 0; i< int(m); i++{
@@ -99,8 +101,8 @@ func newTransferBlock(key *blockpkg.Key, value []byte) *blockpkg.ChainLinkBlock 
 		Points:         coins,
 	}
 	prev := getSourceKey(source)
-	return &blockpkg.ChainLinkBlock{
-		Block:       blockpkg.Block{
+	return &impl.ChainLinkBlock{
+		Block:       impl.Block{
 			Header: header,
 			Body:   body,
 		},
@@ -108,11 +110,11 @@ func newTransferBlock(key *blockpkg.Key, value []byte) *blockpkg.ChainLinkBlock 
 	}
 }
 
-func newPayBlock(key *blockpkg.Key, value []byte) *blockpkg.ChainLinkBlock {
+func newPayBlock(key *header.Key, value []byte) *impl.ChainLinkBlock {
 	source := common.NewZeroCopySource(value)
 	header := getSourceHeader(key, source)
 	from := getSourceKey(source)
-	var points []*blockpkg.Point
+	var points []*body.Point
 	m, eof := source.NextUint64()
 	tryEof(eof)
 	for i := 0; i< int(m); i++{
@@ -123,8 +125,8 @@ func newPayBlock(key *blockpkg.Key, value []byte) *blockpkg.ChainLinkBlock {
 		Points:         points,
 	}
 	prev := getSourceKey(source)
-	return &blockpkg.ChainLinkBlock{
-		Block:       blockpkg.Block{
+	return &impl.ChainLinkBlock{
+		Block:       impl.Block{
 			Header: header,
 			Body:   body,
 		},
@@ -132,35 +134,35 @@ func newPayBlock(key *blockpkg.Key, value []byte) *blockpkg.ChainLinkBlock {
 	}
 }
 
-func getSourceKey(source *common.ZeroCopySource) *blockpkg.Key {
+func getSourceKey(source *common.ZeroCopySource) *header.Key {
 	t, eof := source.NextByte()
 	tryEof(eof)
 	hash, eof := source.NextHash()
 	tryEof(eof)
-	return &blockpkg.Key{
+	return &header.Key{
 		Type: blockpkg.Type(t),
 		Hash: hash,
 	}
 }
 
-func getSourceHeader(key *blockpkg.Key, source *common.ZeroCopySource) *blockpkg.Header {
+func getSourceHeader(key *header.Key, source *common.ZeroCopySource) *header.Header {
 	buff, _, _, eof := source.NextVarBytes()
 	tryEof(eof)
-	return &blockpkg.Header{
+	return &header.Header{
 		Key:       key,
 		Sign:      buff,
 	}
 }
 
 
-func getSourcePoint(source *common.ZeroCopySource) *blockpkg.Point {
+func getSourcePoint(source *common.ZeroCopySource) *body.Point {
 	origin := getSourceKey(source)
 	to := getSourceKey(source)
 	timeStamp, eof := source.NextUint64()
 	tryEof(eof)
 	sign, _, _, eof := source.NextVarBytes()
 	tryEof(eof)
-	return &blockpkg.Point{
+	return &body.Point{
 		Origin: origin,
 		To: to,
 		Timestamp: timeStamp,

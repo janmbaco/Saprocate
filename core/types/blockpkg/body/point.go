@@ -1,10 +1,13 @@
-package blockpkg
+package body
 
-import "github.com/ontio/ontology/common"
+import (
+	"github.com/janmbaco/Saprocate/core/types/blockpkg/header"
+	"github.com/ontio/ontology/common"
+)
 
 type Point struct{
-	Origin *Key
-	To *Key
+	Origin *header.Key
+	To *header.Key
 	Timestamp uint64
 	Sign []byte
 }

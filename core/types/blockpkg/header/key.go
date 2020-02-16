@@ -1,9 +1,12 @@
-package blockpkg
+package header
 
-import "github.com/ontio/ontology/common"
+import (
+	"github.com/janmbaco/Saprocate/core/types/blockpkg"
+	"github.com/ontio/ontology/common"
+)
 
 type Key struct{
-	Type Type
+	Type blockpkg.Type
 	Hash common.Uint256
 }
 

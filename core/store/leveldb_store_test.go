@@ -6,6 +6,8 @@ import (
 	"fmt"
 	common2 "github.com/janmbaco/Saprocate/common"
 	"github.com/janmbaco/Saprocate/core/types/blockpkg/body"
+	"github.com/janmbaco/Saprocate/core/types/blockpkg/header"
+	"github.com/janmbaco/Saprocate/core/types/blockpkg/impl"
 	"math/rand"
 	"os"
 	"sync"
@@ -39,22 +41,22 @@ func TestSaveDB(t *testing.T) {
 		h.Write(bs)
 		sum := h.Sum(nil)
 		ui256, _ := common.Uint256ParseFromBytes(sum)
-		positive := &blockpkg.ChainLinkBlock{
-			Block: blockpkg.Block{
-				Header: &blockpkg.Header{
-					Key: &blockpkg.Key{
+		positive := &impl.ChainLinkBlock{
+			Block: impl.Block{
+				Header: &header.Header{
+					Key: &header.Key{
 						Type: blockpkg.Positive,
 						Hash: ui256,
 					},
 					Sign: bs,
 				},
 				Body: &body.Positive{
-					Point: &blockpkg.Point{
-						Origin: &blockpkg.Key{
+					Point: &body.Point{
+						Origin: &header.Key{
 							Type: blockpkg.Origin,
 							Hash: ui256,
 						},
-						To: &blockpkg.Key{
+						To: &header.Key{
 							Type: blockpkg.Origin,
 							Hash: common.UINT256_EMPTY,
 						},
@@ -63,7 +65,7 @@ func TestSaveDB(t *testing.T) {
 					},
 				},
 			},
-			PrevHashKey: &blockpkg.Key{
+			PrevHashKey: &header.Key{
 				Type: blockpkg.Origin,
 				Hash: common.UINT256_EMPTY,
 			},
@@ -97,11 +99,11 @@ func TestGetDB(t *testing.T) {
 					t.Log(fmt.Printf("Not found %v", i))
 				}
 			}()
-			block := testLevelDB.Get(&blockpkg.Key{
+			block := testLevelDB.Get(&header.Key{
 				Type: blockpkg.Positive,
 				Hash: ui256,
 			})
-			if block.(*blockpkg.ChainLinkBlock).Header.Key.Hash != ui256 {
+			if block.(*impl.ChainLinkBlock).Header.Key.Hash != ui256 {
 				t.Log("incorrecto")
 			}
 		}(&wg)

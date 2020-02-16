@@ -1,13 +1,16 @@
-package blockpkg
+package impl
 
-import "github.com/ontio/ontology/common"
+import (
+	"github.com/janmbaco/Saprocate/core/types/blockpkg/header"
+	"github.com/ontio/ontology/common"
+)
 
 type ChainLinkBlock struct {
 	Block
-	PrevHashKey *Key
+	PrevHashKey *header.Key
 }
 
-func (this *ChainLinkBlock) GetOrigin() *Key {
+func (this *ChainLinkBlock) GetOrigin() *header.Key {
 	return this.Body.GetOrigin()
 }
 

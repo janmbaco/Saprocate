@@ -9,6 +9,8 @@ import (
 	store2 "github.com/janmbaco/Saprocate/core/store"
 	"github.com/janmbaco/Saprocate/core/types/blockpkg"
 	"github.com/janmbaco/Saprocate/core/types/blockpkg/body"
+	"github.com/janmbaco/Saprocate/core/types/blockpkg/header"
+	"github.com/janmbaco/Saprocate/core/types/blockpkg/impl"
 	"github.com/ontio/ontology/common"
 	"os"
 	"sync"
@@ -21,7 +23,7 @@ var blockService *BlockService
 type keyPairStruct struct {
 	privateKey *rsa.PrivateKey
 	publicKey  *rsa.PublicKey
-	key        *blockpkg.Key
+	key        *header.Key
 	sign       []byte
 }
 
@@ -34,14 +36,14 @@ func TestMain(m *testing.M) {
 	keyPair = make([]*keyPairStruct, 4)
 	for i := 0; i < 4; i++ {
 		keyPair[i], _ = generateKeyPair(2048)
-		block := &blockpkg.Block{
+		block := &impl.Block{
 			Header: nil,
 			Body:   &body.Origin{PublicKey: keyPair[i].publicKey},
 		}
 		sign, _ := sign(keyPair[i].privateKey, block.GetDataSigned())
 		signSum := sha256.Sum256(sign)
 		ui256, _ := common.Uint256ParseFromBytes(signSum[:])
-		keyPair[i].key = &blockpkg.Key{
+		keyPair[i].key = &header.Key{
 			Type: blockpkg.Origin,
 			Hash: ui256,
 		}
@@ -61,8 +63,8 @@ func TestRegisterOrigins(t *testing.T) {
 		wg.Add(1)
 		go func(keypair *keyPairStruct) {
 			defer wg.Done()
-			blockService.RegisterOrigin(&blockpkg.Block{
-				Header: &blockpkg.Header{
+			blockService.RegisterOrigin(&impl.Block{
+				Header: &header.Header{
 					Key:  keypair.key,
 					Sign: keypair.sign,
 				},
@@ -84,17 +86,17 @@ func TestGivePoints(t *testing.T) {
 			wg.Add(1)
 			go func(i int, j int) {
 				defer wg.Done()
-				point := blockpkg.Point{
+				point := body.Point{
 					Origin:    keyPair[j].key,
 					To:        keyPair[j+2].key,
 					Timestamp: uint64(time.Now().UnixNano()),
 					Sign:      nil,
 				}
 				point.Sign, _ = sign(keyPair[j].privateKey, point.GetDataSigned())
-				positive := &blockpkg.ChainLinkBlock{
-					Block: blockpkg.Block{
-						Header: &blockpkg.Header{
-							Key: &blockpkg.Key{
+				positive := &impl.ChainLinkBlock{
+					Block: impl.Block{
+						Header: &header.Header{
+							Key: &header.Key{
 								Type: blockpkg.Positive,
 								Hash: common.UINT256_EMPTY,
 							},
@@ -107,9 +109,6 @@ func TestGivePoints(t *testing.T) {
 					PrevHashKey: nil,
 				}
 				common2.TryError(func() {
-					if i == 5 {
-						time.Sleep(1)
-					}
 					nonce := blockService.ReservePrevHash(positive)
 					positive.Header.Sign, _ = sign(keyPair[j+2].privateKey, positive.GetDataSigned())
 					blockService.EnchainBlock(positive, nonce)

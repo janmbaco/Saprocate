@@ -3,8 +3,8 @@ package store
 import (
 	"github.com/ethereum/go-ethereum/common/fdlimit"
 	"github.com/janmbaco/Saprocate/common"
-	"github.com/janmbaco/Saprocate/core/types"
 	"github.com/janmbaco/Saprocate/core/types/blockpkg"
+	"github.com/janmbaco/Saprocate/core/types/blockpkg/header"
 	"github.com/janmbaco/go-reverseproxy-ssl/cross"
 	common2 "github.com/ontio/ontology/common"
 	"github.com/syndtr/goleveldb/leveldb"
@@ -58,23 +58,26 @@ func (this *LevelDbStore) Save(b blockpkg.Interface)  {
 
 }
 
-func (this *LevelDbStore) Has(key *blockpkg.Key) bool {
+func (this *LevelDbStore) Has(key *header.Key) bool {
 	b, err := this.db.Has(key.ToBytes(), nil)
 	cross.TryPanic(err)
 	return b
 }
 
-func (this *LevelDbStore) Get(key *blockpkg.Key) blockpkg.Interface {
+func (this *LevelDbStore) Get(key *header.Key) blockpkg.Interface {
 	dat, err := this.db.Get(key.ToBytes(), nil)
 	cross.TryPanic(err)
-	return types.BlockFromBytes(key, this.crypter.Decrypt(dat))
+	return BlockFromBytes(key, this.crypter.Decrypt(dat))
 }
 
-func (this *LevelDbStore) GetAll(t blockpkg.Type) []blockpkg.Interface {
+func (this *LevelDbStore) Query(rang *util.Range, where func(block blockpkg.Interface)bool) []blockpkg.Interface {
 	var result []blockpkg.Interface
-	iter := this.db.NewIterator(util.BytesPrefix([]byte{byte(t)}), nil)
+	iter := this.db.NewIterator(rang, nil)
 	for iter.Next() {
-		result = append(result, types.BlockFromBytes(types.KeyFromBytes(iter.Key()), this.crypter.Decrypt(iter.Value())))
+		block := BlockFromBytes(KeyFromBytes(iter.Key()), this.crypter.Decrypt(iter.Value()))
+		if where(block) {
+			result = append(result, block)
+		}
 	}
 	iter.Release()
 	err := iter.Error()
@@ -82,8 +85,20 @@ func (this *LevelDbStore) GetAll(t blockpkg.Type) []blockpkg.Interface {
 	return result
 }
 
-func (this *LevelDbStore) GetLastKey() *blockpkg.Key{
-	result := &blockpkg.Key{
+func (this *LevelDbStore) GetAll(t blockpkg.Type) []blockpkg.Interface {
+	var result []blockpkg.Interface
+	iter := this.db.NewIterator(util.BytesPrefix([]byte{byte(t)}), nil)
+	for iter.Next() {
+		result = append(result, BlockFromBytes(KeyFromBytes(iter.Key()), this.crypter.Decrypt(iter.Value())))
+	}
+	iter.Release()
+	err := iter.Error()
+	cross.TryPanic(err)
+	return result
+}
+
+func (this *LevelDbStore) GetLastKey() *header.Key {
+	result := &header.Key{
 		Type: blockpkg.Origin,
 		Hash: common2.UINT256_EMPTY,
 	}
@@ -92,7 +107,7 @@ func (this *LevelDbStore) GetLastKey() *blockpkg.Key{
 	if b {
 		dat, err := this.db.Get(cLastkey, nil)
 		cross.TryPanic(err)
-		result = types.KeyFromBytes(this.crypter.Decrypt(dat))
+		result = KeyFromBytes(this.crypter.Decrypt(dat))
 	}
 	return result
 }

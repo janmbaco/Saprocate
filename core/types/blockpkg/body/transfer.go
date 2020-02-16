@@ -1,15 +1,16 @@
 package body
 
 import (
-	"github.com/janmbaco/Saprocate/core/types/blockpkg"
+	"github.com/janmbaco/Saprocate/core/types/blockpkg/header"
+	"github.com/janmbaco/Saprocate/core/types/blockpkg/impl"
 	"github.com/ontio/ontology/common"
 )
 
 type Transfer struct{
-	blockpkg.ChainLinkBlock
-	From     *blockpkg.Key
-	To       *blockpkg.Key
-	Points   []*blockpkg.Point
+	impl.ChainLinkBlock
+	From     *header.Key
+	To       *header.Key
+	Points   []*Point
 }
 
 func(this *Transfer) SerializeData(sink *common.ZeroCopySink) {
@@ -21,11 +22,11 @@ func(this *Transfer) SerializeData(sink *common.ZeroCopySink) {
 	}
 }
 
-func(this *Transfer) GetOrigin() *blockpkg.Key{
+func(this *Transfer) GetOrigin() *header.Key {
 	return this.From
 }
 
-func(this *Transfer) GetPoints() []*blockpkg.Point{
+func(this *Transfer) GetPoints() []*Point {
 	return this.Points
 }
 

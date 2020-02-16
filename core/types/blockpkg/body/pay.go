@@ -1,13 +1,13 @@
 package body
 
 import (
-	"github.com/janmbaco/Saprocate/core/types/blockpkg"
+	"github.com/janmbaco/Saprocate/core/types/blockpkg/header"
 	"github.com/ontio/ontology/common"
 )
 
 type Pay struct{
-	From     *blockpkg.Key
-	Points   []*blockpkg.Point
+	From     *header.Key
+	Points   []*Point
 }
 
 func(this *Pay) SerializeData(sink *common.ZeroCopySink) {
@@ -18,10 +18,10 @@ func(this *Pay) SerializeData(sink *common.ZeroCopySink) {
 	}
 }
 
-func(this *Pay) GetOrigin() *blockpkg.Key{
+func(this *Pay) GetOrigin() *header.Key {
 	return this.From
 }
 
-func(this *Pay) GetPoints() []*blockpkg.Point{
+func(this *Pay) GetPoints() []*Point {
 	return this.Points
 }
