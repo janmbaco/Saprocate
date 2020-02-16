@@ -1,6 +1,8 @@
-package blockpkg
+package header
 
-import "github.com/ontio/ontology/common"
+import (
+	"github.com/ontio/ontology/common"
+)
 
 type Key struct{
 	Type Type

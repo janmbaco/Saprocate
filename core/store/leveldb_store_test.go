@@ -6,12 +6,13 @@ import (
 	"fmt"
 	common2 "github.com/janmbaco/Saprocate/common"
 	"github.com/janmbaco/Saprocate/core/types/blockpkg/body"
+	"github.com/janmbaco/Saprocate/core/types/blockpkg/impl"
 	"math/rand"
 	"os"
 	"sync"
 	"testing"
 
-	"github.com/janmbaco/Saprocate/core/types/blockpkg"
+	"github.com/janmbaco/Saprocate/core/types/blockpkg/header"
 	"github.com/ontio/ontology/common"
 )
 
@@ -39,23 +40,23 @@ func TestSaveDB(t *testing.T) {
 		h.Write(bs)
 		sum := h.Sum(nil)
 		ui256, _ := common.Uint256ParseFromBytes(sum)
-		positive := &blockpkg.ChainLinkBlock{
-			Block: blockpkg.Block{
-				Header: &blockpkg.Header{
-					Key: &blockpkg.Key{
-						Type: blockpkg.Positive,
+		positive := &impl.ChainLinkBlock{
+			Block: impl.Block{
+				Header: &header.Header{
+					Key: &header.Key{
+						Type: header.Numu,
 						Hash: ui256,
 					},
 					Sign: bs,
 				},
-				Body: &body.Positive{
-					Point: &blockpkg.Point{
-						Origin: &blockpkg.Key{
-							Type: blockpkg.Origin,
+				Body: &body.Numu{
+					Point: &body.Point{
+						Origin: &header.Key{
+							Type: header.Origin,
 							Hash: ui256,
 						},
-						To: &blockpkg.Key{
-							Type: blockpkg.Origin,
+						To: &header.Key{
+							Type: header.Origin,
 							Hash: common.UINT256_EMPTY,
 						},
 						Timestamp: 0,
@@ -63,8 +64,8 @@ func TestSaveDB(t *testing.T) {
 					},
 				},
 			},
-			PrevHashKey: &blockpkg.Key{
-				Type: blockpkg.Origin,
+			PrevHashKey: &header.Key{
+				Type: header.Origin,
 				Hash: common.UINT256_EMPTY,
 			},
 		}
@@ -97,11 +98,11 @@ func TestGetDB(t *testing.T) {
 					t.Log(fmt.Printf("Not found %v", i))
 				}
 			}()
-			block := testLevelDB.Get(&blockpkg.Key{
-				Type: blockpkg.Positive,
+			block := testLevelDB.Get(&header.Key{
+				Type: header.Numu,
 				Hash: ui256,
 			})
-			if block.(*blockpkg.ChainLinkBlock).Header.Key.Hash != ui256 {
+			if block.(*impl.ChainLinkBlock).Header.Key.Hash != ui256 {
 				t.Log("incorrecto")
 			}
 		}(&wg)
@@ -111,7 +112,7 @@ func TestGetDB(t *testing.T) {
 
 
 func TestGetAllDB(t *testing.T) {
-	arblock := testLevelDB.GetAll(blockpkg.Positive)
+	arblock := testLevelDB.GetAll(header.Numu)
 	t.Log(len(arblock))
 }
 

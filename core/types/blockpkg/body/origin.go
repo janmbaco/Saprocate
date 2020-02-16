@@ -3,7 +3,7 @@ package body
 import (
 	"crypto/rsa"
 	"encoding/asn1"
-	"github.com/janmbaco/Saprocate/core/types/blockpkg"
+	"github.com/janmbaco/Saprocate/core/types/blockpkg/header"
 	"github.com/janmbaco/go-reverseproxy-ssl/cross"
 	"github.com/ontio/ontology/common"
 )
@@ -18,7 +18,7 @@ func(this *Origin) SerializeData(sink *common.ZeroCopySink){
 	sink.WriteVarBytes(pubBytes)
 }
 
-func(this *Origin) GetOrigin() *blockpkg.Key{
+func(this *Origin) GetOrigin() *header.Key {
 	return nil
 }
 

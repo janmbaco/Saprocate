@@ -1,11 +1,11 @@
 package types
 
 import (
-	"github.com/janmbaco/Saprocate/core/types/blockpkg"
+	"github.com/janmbaco/Saprocate/core/types/blockpkg/header"
 )
 
 type (
 	Summary struct {
-		Owner *blockpkg.Key
-		PointsCards map[blockpkg.Key]uint
+		Owner *header.Key
+		PointsCards map[header.Key]uint
 	})

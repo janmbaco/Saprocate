@@ -1,17 +1,21 @@
-package blockpkg
+package impl
 
-import "github.com/ontio/ontology/common"
+import (
+	"github.com/janmbaco/Saprocate/core/types/blockpkg/body"
+	"github.com/janmbaco/Saprocate/core/types/blockpkg/header"
+	"github.com/ontio/ontology/common"
+)
 
 type Block struct{
-	Header *Header
-	Body BodyBlock
+	Header *header.Header
+	Body   body.Interface
 }
 
-func(this *Block) GetType() Type{
+func(this *Block) GetType() header.Type {
 	return this.Header.Key.Type
 }
 
-func(this *Block) GetOrigin() *Key{
+func(this *Block) GetOrigin() *header.Key {
 	return this.Header.Key
 }
 

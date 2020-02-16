@@ -1,4 +1,4 @@
-package blockpkg
+package header
 
 type Header struct{
 	Key *Key
