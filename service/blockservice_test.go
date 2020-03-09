@@ -11,43 +11,39 @@ import (
 	"github.com/janmbaco/Saprocate/core/types/blockpkg/body"
 	"github.com/janmbaco/Saprocate/core/types/blockpkg/header"
 	"github.com/janmbaco/Saprocate/core/types/blockpkg/impl"
+	"github.com/janmbaco/Saprocate/core/types/blockpkg/interfaces"
 	"github.com/ontio/ontology/common"
+	rand2 "math/rand"
 	"os"
 	"sync"
 	"testing"
 	"time"
 )
 
-var blockService *BlockService
+var blockServices []*BlockService
 
 type keyPairStruct struct {
 	privateKey *rsa.PrivateKey
 	publicKey  *rsa.PublicKey
-	key        *header.Key
-	sign       []byte
+	block      interfaces.IBlock
 }
 
 var keyPair []*keyPairStruct
 
 func TestMain(m *testing.M) {
 	dbFile := "./test"
-	testLevelDB := store2.NewLevelDBStore(dbFile, common2.NewCrypter([]byte{0x0, 0x1, 0x2, 0x3, 0x4, 0x5, 0x6, 0x7, 0x8, 0x9, 0xa, 0xb, 0xc, 0xd, 0xe, 0xf}))
+	crypter := common2.NewCrypter([]byte{0x0, 0x1, 0x2, 0x3, 0x4, 0x5, 0x6, 0x7, 0x8, 0x9, 0xa, 0xb, 0xc, 0xd, 0xe, 0xf})
+	testLevelDB := store2.NewLevelDBStore(dbFile, crypter)
 	testLevelDB.Open()
 	keyPair = make([]*keyPairStruct, 4)
+	blockServices = make([]*BlockService, 3)
+	blockServices[0] = NewBlockService(Locorum, "./locorum")
 	for i := 0; i < 4; i++ {
+
 		keyPair[i], _ = generateKeyPair(2048)
-		block := &impl.Block{
-			Header: nil,
-			Body:   &body.Origin{PublicKey: keyPair[i].publicKey},
-		}
-		sign, _ := sign(keyPair[i].privateKey, block.GetDataSigned())
-		signSum := sha256.Sum256(sign)
-		ui256, _ := common.Uint256ParseFromBytes(signSum[:])
-		keyPair[i].key = &header.Key{
-			Type: blockpkg.Origin,
-			Hash: ui256,
-		}
-		keyPair[i].sign = sign
+		keyPair[i].block = impl.NewOriginBlock(keyPair[i].publicKey)
+		sign, _ := sign(keyPair[i].privateKey, keyPair[i].block.GetDataSigned())
+		keyPair[i].block.SetSign(sign)
 	}
 	blockService = NewBlockService(testLevelDB)
 	defer func() {
@@ -63,15 +59,7 @@ func TestRegisterOrigins(t *testing.T) {
 		wg.Add(1)
 		go func(keypair *keyPairStruct) {
 			defer wg.Done()
-			blockService.RegisterOrigin(&impl.Block{
-				Header: &header.Header{
-					Key:  keypair.key,
-					Sign: keypair.sign,
-				},
-				Body: &body.Origin{
-					PublicKey: keypair.publicKey,
-				},
-			})
+			blockService.RegisterOrigin(keypair.block)
 
 		}(keypair)
 
@@ -86,32 +74,16 @@ func TestGivePoints(t *testing.T) {
 			wg.Add(1)
 			go func(i int, j int) {
 				defer wg.Done()
-				point := body.Point{
-					Origin:    keyPair[j].key,
-					To:        keyPair[j+2].key,
-					Timestamp: uint64(time.Now().UnixNano()),
-					Sign:      nil,
-				}
-				point.Sign, _ = sign(keyPair[j].privateKey, point.GetDataSigned())
-				positive := &impl.ChainLinkBlock{
-					Block: impl.Block{
-						Header: &header.Header{
-							Key: &header.Key{
-								Type: blockpkg.Positive,
-								Hash: common.UINT256_EMPTY,
-							},
-							Sign: nil,
-						},
-						Body: &body.Positive{
-							Point: &point,
-						},
-					},
-					PrevHashKey: nil,
-				}
+				point := body.NewPoint(keyPair[j].block.GetOrigin(), uint64(time.Now().UnixNano()), rand2.Uint32(), uint64(time.Now().UnixNano()))
+				pointSign, _ := sign(keyPair[j].privateKey, point.GetDataSigned())
+				point.SetSign(pointSign)
+				positive := impl.NewPositiveBlock(point, keyPair[j+2].block.GetOrigin())
+
 				common2.TryError(func() {
-					nonce := blockService.ReservePrevHash(positive)
-					positive.Header.Sign, _ = sign(keyPair[j+2].privateKey, positive.GetDataSigned())
-					blockService.EnchainBlock(positive, nonce)
+					nonce := blockServices[0].ReservePrevHash(positive)
+					blockSign, _ := sign(keyPair[j+2].privateKey, positive.GetDataSigned())
+					positive.SetSign(blockSign)
+					blockServices[0].EnchainBlock(positive, nonce)
 				}, func(err error) {
 					t.Logf("i %d j %d error %s", i, j, err.Error())
 				})

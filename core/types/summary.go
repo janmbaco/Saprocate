@@ -1,11 +1,17 @@
 package types
 
 import (
-	"github.com/janmbaco/Saprocate/core/types/blockpkg/header"
+	"github.com/janmbaco/Saprocate/core/types/blockpkg/interfaces"
 )
 
-type (
-	Summary struct {
-		Owner *header.Key
-		PointsCards map[header.Key]uint
-	})
+type Summary struct {
+	Owner       interfaces.IKey
+	PointsCards map[interfaces.IKey]uint
+}
+
+func NewSummary(owner interfaces.IKey) *Summary {
+	return &Summary{
+		Owner:       owner,
+		PointsCards: make(map[interfaces.IKey]uint),
+	}
+}

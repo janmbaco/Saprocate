@@ -1,19 +1,26 @@
 package body
 
 import (
-	"github.com/janmbaco/Saprocate/core/types/blockpkg/header"
+	"github.com/janmbaco/Saprocate/core/types/blockpkg/interfaces"
 	"github.com/ontio/ontology/common"
 )
 
-type Negative struct{
-	PositiveBlockKey *header.Key
+type Negative struct {
+	positiveBlock interfaces.IBlock
 }
 
-func(this *Negative) SerializeData(sink *common.ZeroCopySink) {
-	this.PositiveBlockKey.Serialize(sink)
+func NewNegative(positiveBlock interfaces.IBlock) *Negative {
+	return &Negative{positiveBlock: positiveBlock}
 }
 
-func(this *Negative) GetOrigin() *header.Key {
-	return this.PositiveBlockKey
+func (this *Negative) SerializeData(sink *common.ZeroCopySink) {
+	sink.WriteVarBytes(this.positiveBlock.ValueToBytes())
 }
 
+func (this *Negative) GetOrigin() interfaces.IKey {
+	return this.positiveBlock.GetOrigin()
+}
+
+func (this *Negative) GetPositiveBlock() interfaces.IBlock {
+	return this.positiveBlock
+}

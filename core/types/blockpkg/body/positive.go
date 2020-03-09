@@ -1,22 +1,28 @@
 package body
 
 import (
-	"github.com/janmbaco/Saprocate/core/types/blockpkg/header"
+	"github.com/janmbaco/Saprocate/core/types/blockpkg/interfaces"
 	"github.com/ontio/ontology/common"
 )
 
-type Positive struct{
-	Point    *Point
+type Positive struct {
+	point interfaces.IPoint
+	to    interfaces.IKey
 }
 
-func(this *Positive) SerializeData(sink *common.ZeroCopySink) {
-	this.Point.Serilize(sink)
+func NewPositive(point interfaces.IPoint, to interfaces.IKey) *Positive {
+	return &Positive{point: point, to: to}
 }
 
-func(this *Positive) GetOrigin() *header.Key {
-	return this.Point.To
+func (this *Positive) SerializeData(sink *common.ZeroCopySink) {
+	this.point.Serialize(sink)
+	this.to.Serialize(sink)
 }
 
-func(this *Positive) GetPoints() []*Point {
-	return []*Point{this.Point}
+func (this *Positive) GetOrigin() interfaces.IKey {
+	return this.to
+}
+
+func (this *Positive) GetPoint() interfaces.IPoint {
+	return this.point
 }

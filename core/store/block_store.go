@@ -7,167 +7,132 @@ import (
 	"github.com/janmbaco/Saprocate/core/types/blockpkg/body"
 	"github.com/janmbaco/Saprocate/core/types/blockpkg/header"
 	"github.com/janmbaco/Saprocate/core/types/blockpkg/impl"
+	"github.com/janmbaco/Saprocate/core/types/blockpkg/interfaces"
 	"github.com/janmbaco/go-reverseproxy-ssl/cross"
 	"github.com/ontio/ontology/common"
 	"io"
 )
 
-func BlockFromBytes(key *header.Key, value []byte) blockpkg.Interface {
-	var result blockpkg.Interface
-	switch key.Type {
+func BlockFromBytes(key interfaces.IKey, value []byte) interfaces.IBlock {
+	var result interfaces.IBlock
+	switch key.GetType() {
 	case blockpkg.Origin:
-		result = newOriginBlock(key, value)
+		result = newOriginBlock(value)
 	case blockpkg.Positive:
-		result = newPositiveBlock(key, value)
+		result = newPositiveBlock(value)
 	case blockpkg.Negative:
-		result = newNegativeBlock(key, value)
-	case blockpkg.Transfer:
-		result = newTransferBlock(key, value)
-	case blockpkg.Pay:
-		result = newPayBlock(key, value)
+		result = newNegativeBlock(value)
+	case blockpkg.Voucher:
+		result = newVoucherBlock(value)
+	case blockpkg.Consumption:
+		result = newConsumptionBlock(value)
 	}
 	return result
 }
 
-func KeyFromBytes(raw []byte) *header.Key {
+func KeyFromBytes(raw []byte) interfaces.IKey {
 	return getSourceKey(common.NewZeroCopySource(raw))
 }
 
-func newOriginBlock(key *header.Key, value []byte) *impl.Block {
+func newOriginBlock(value []byte) interfaces.IBlock {
 	source := common.NewZeroCopySource(value)
-	header := getSourceHeader(key, source)
+	sign := getSourceSign(source)
 	buff, _, _, eof := source.NextVarBytes()
 	tryEof(eof)
 	pk := new(rsa.PublicKey)
 	_, err := asn1.Unmarshal(buff, pk)
 	cross.TryPanic(err)
-	body := &body.Origin{
-		PublicKey: pk,
-	}
-	return &impl.Block{
-		Header: header,
-		Body:   body,
-	}
+	originBlock := impl.NewOriginBlock(pk)
+	originBlock.SetSign(sign)
+	return originBlock
 }
 
-func newPositiveBlock(key *header.Key, value []byte) *impl.ChainLinkBlock {
+func newPositiveBlock(value []byte) interfaces.IBlock {
 	source := common.NewZeroCopySource(value)
-	header := getSourceHeader(key, source)
+	return getSourcePositiveBlock(source)
+}
+
+func newNegativeBlock(value []byte) interfaces.IBlock {
+	source := common.NewZeroCopySource(value)
+	sign := getSourceSign(source)
+	positiveBlock := getSourcePositiveBlock(source)
+	firstPrev := getSourceKey(source)
+	secondPrev := getSourceKey(source)
+	negativeBlock := impl.NewNegativeblock(positiveBlock)
+	negativeBlock.SetSign(sign)
+	negativeBlock.SetPreviousHash(blockpkg.FirstPrevHash, firstPrev)
+	negativeBlock.SetPreviousHash(blockpkg.SecondPrvHash, secondPrev)
+	return negativeBlock
+}
+
+func newVoucherBlock(value []byte) interfaces.IBlock {
+	source := common.NewZeroCopySource(value)
+	sign := getSourceSign(source)
 	point := getSourcePoint(source)
-	body :=  &body.Positive{
-		Point:          point,
-	}
+	hashNegativeBlock := getSourceKey(source)
+	hashPositiveBlock := getSourceKey(source)
+	origin := getSourceKey(source)
 	prev := getSourceKey(source)
-	return &impl.ChainLinkBlock{
-		Block:       impl.Block{
-			Header: header,
-			Body:   body,
-		},
-		PrevHashKey: prev,
-	}
+	voucherBlock := impl.NewVoucherBlock(point, hashNegativeBlock, hashPositiveBlock, origin)
+	voucherBlock.SetSign(sign)
+	voucherBlock.SetPreviousHash(blockpkg.FirstPrevHash, prev)
+	return voucherBlock
 }
 
-func newNegativeBlock(key *header.Key, value []byte) *impl.ChainLinkBlock {
+func newConsumptionBlock(value []byte) interfaces.IBlock {
 	source := common.NewZeroCopySource(value)
-	header := getSourceHeader(key, source)
-	positiveBlock := getSourceKey(source)
-	body :=  &body.Negative{
-		PositiveBlockKey: positiveBlock,
+	sign := getSourceSign(source)
+	var positiveBlocks []interfaces.IBlock
+	m, eof := source.NextUint64()
+	tryEof(eof)
+	for i := 0; i < int(m); i++ {
+		positiveBlocks = append(positiveBlocks, getSourcePositiveBlock(source))
 	}
 	prev := getSourceKey(source)
-	return &impl.ChainLinkBlock{
-		Block:       impl.Block{
-			Header: header,
-			Body:   body,
-		},
-		PrevHashKey: prev,
-	}
+	consumptionBlock := impl.NewConsumptionBlock(positiveBlocks)
+	consumptionBlock.SetSign(sign)
+	consumptionBlock.SetPreviousHash(blockpkg.FirstPrevHash, prev)
+	return consumptionBlock
 }
 
-func newTransferBlock(key *header.Key, value []byte) *impl.ChainLinkBlock {
-	source := common.NewZeroCopySource(value)
-	header := getSourceHeader(key, source)
-	from := getSourceKey(source)
+func getSourcePositiveBlock(source *common.ZeroCopySource) interfaces.IBlock {
+	sign := getSourceSign(source)
+	point := getSourcePoint(source)
 	to := getSourceKey(source)
-	var coins []*body.Point
-	m, eof := source.NextUint64()
-	tryEof(eof)
-	for i := 0; i< int(m); i++{
-		coins = append(coins, getSourcePoint(source))
-	}
-	body := &body.Transfer{
-		From:           from,
-		To:             to,
-		Points:         coins,
-	}
 	prev := getSourceKey(source)
-	return &impl.ChainLinkBlock{
-		Block:       impl.Block{
-			Header: header,
-			Body:   body,
-		},
-		PrevHashKey: prev,
-	}
+	positiveBlock := impl.NewPositiveBlock(point, to)
+	positiveBlock.SetSign(sign)
+	positiveBlock.SetPreviousHash(blockpkg.FirstPrevHash, prev)
+	return positiveBlock
 }
 
-func newPayBlock(key *header.Key, value []byte) *impl.ChainLinkBlock {
-	source := common.NewZeroCopySource(value)
-	header := getSourceHeader(key, source)
-	from := getSourceKey(source)
-	var points []*body.Point
-	m, eof := source.NextUint64()
-	tryEof(eof)
-	for i := 0; i< int(m); i++{
-		points = append(points, getSourcePoint(source))
-	}
-	body := &body.Pay{
-		From:           from,
-		Points:         points,
-	}
-	prev := getSourceKey(source)
-	return &impl.ChainLinkBlock{
-		Block:       impl.Block{
-			Header: header,
-			Body:   body,
-		},
-		PrevHashKey: prev,
-	}
-}
-
-func getSourceKey(source *common.ZeroCopySource) *header.Key {
+func getSourceKey(source *common.ZeroCopySource) interfaces.IKey {
 	t, eof := source.NextByte()
 	tryEof(eof)
 	hash, eof := source.NextHash()
 	tryEof(eof)
-	return &header.Key{
-		Type: blockpkg.Type(t),
-		Hash: hash,
-	}
+	return header.NewKey(blockpkg.BlockType(t), hash)
 }
 
-func getSourceHeader(key *header.Key, source *common.ZeroCopySource) *header.Header {
+func getSourceSign(source *common.ZeroCopySource) []byte {
 	buff, _, _, eof := source.NextVarBytes()
 	tryEof(eof)
-	return &header.Header{
-		Key:       key,
-		Sign:      buff,
-	}
+	return buff
 }
 
-
-func getSourcePoint(source *common.ZeroCopySource) *body.Point {
+func getSourcePoint(source *common.ZeroCopySource) interfaces.IPoint {
 	origin := getSourceKey(source)
-	to := getSourceKey(source)
 	timeStamp, eof := source.NextUint64()
+	tryEof(eof)
+	nonce, eof := source.NextUint32()
+	tryEof(eof)
+	expireDate, eof := source.NextUint64()
 	tryEof(eof)
 	sign, _, _, eof := source.NextVarBytes()
 	tryEof(eof)
-	return &body.Point{
-		Origin: origin,
-		To: to,
-		Timestamp: timeStamp,
-		Sign: sign,
-	}
+	point := body.NewPoint(origin, timeStamp, nonce, expireDate)
+	point.SetSign(sign)
+	return point
 }
 
 func tryEof(eof bool) {

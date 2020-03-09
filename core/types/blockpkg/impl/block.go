@@ -2,41 +2,60 @@ package impl
 
 import (
 	"github.com/janmbaco/Saprocate/core/types/blockpkg"
-	"github.com/janmbaco/Saprocate/core/types/blockpkg/body"
-	"github.com/janmbaco/Saprocate/core/types/blockpkg/header"
+	"github.com/janmbaco/Saprocate/core/types/blockpkg/interfaces"
 	"github.com/ontio/ontology/common"
 )
 
-type Block struct{
-	Header *header.Header
-	Body   body.Interface
+type Block struct {
+	header interfaces.IHeader
+	body   interfaces.IBody
 }
 
-func(this *Block) GetType() blockpkg.Type {
-	return this.Header.Key.Type
+func (this *Block) GetType() blockpkg.BlockType {
+	return this.header.GetType()
 }
 
-func(this *Block) GetOrigin() *header.Key {
-	return this.Header.Key
+func (this *Block) GetHeader() interfaces.IHeader {
+	return this.header
 }
 
-func(this *Block) GetSign() []byte{
-	return this.Header.Sign
+func (this *Block) GetOrigin() interfaces.IKey {
+	return this.header.GetKey()
 }
 
-func(this *Block) GetDataSigned() []byte{
+func (this *Block) GetBody() interfaces.IBody {
+	return this.body
+}
+
+func (this *Block) GetSign() []byte {
+	return this.header.GetSign()
+}
+
+func (this *Block) SetSign(sign []byte) {
+	this.header.SetSign(sign)
+}
+
+func (this *Block) GetDataSigned() []byte {
 	sink := &common.ZeroCopySink{}
-	this.Body.SerializeData(sink)
+	this.body.SerializeData(sink)
 	return sink.Bytes()
 }
 
-func(this *Block) KeyToBytes() []byte{
-	return this.Header.Key.ToBytes()
+func (this *Block) KeyToBytes() []byte {
+	return this.header.GetKey().ToBytes()
 }
 
-func(this *Block) ValueToBytes() []byte{
+func (this *Block) ValueToBytes() []byte {
 	sink := &common.ZeroCopySink{}
-	sink.WriteVarBytes(this.Header.Sign)
-	this.Body.SerializeData(sink)
+	sink.WriteVarBytes(this.header.GetSign())
+	this.body.SerializeData(sink)
 	return sink.Bytes()
+}
+
+func (this *Block) GetPreviousHash(prevHashType blockpkg.PrevHashType) interfaces.IKey {
+	return nil
+}
+
+func (this *Block) SetPreviousHash(prevHashType blockpkg.PrevHashType, key interfaces.IKey) {
+	//do nothing
 }

@@ -1,11 +1,18 @@
 package blockpkg
 
-type Type byte
+type BlockType byte
 
-const(
-	Origin Type = iota
+const (
+	Origin BlockType = iota
 	Positive
 	Negative
-	Transfer
-	Pay
+	Consumption
+	Voucher
+)
+
+type PrevHashType byte
+
+const (
+	FirstPrevHash PrevHashType = iota
+	SecondPrvHash
 )
